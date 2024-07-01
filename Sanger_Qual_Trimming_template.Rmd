@@ -83,6 +83,7 @@ The function `read_trimming`` in the below code chunk will require the dataframe
 
 ```{r trimming_module}
 library(readr)
+library(stringr)
 read_trimming <- function(sample_name,input_tsv,input_coord1, input_coord2){
 #first, code for converting dataframe column into string
 full_seq <- paste(input_tsv$Base.Call[], collapse="")
@@ -92,6 +93,8 @@ trimmed_seq <- paste(input_tsv$Base.Call[input_coord1:nrow(input_tsv)], collapse
 trimmed_seq2 <- paste(input_tsv$Base.Call[input_coord1:input_coord2], collapse="")
 trimmed_length <- (nchar(full_seq) - nchar(trimmed_seq))
 trimmed_length2 <- (nchar(full_seq) - nchar(trimmed_seq2))
+N_content <- str_count(trimmed_seq2, "N")
+N_percent <- N_content/(nchar(trimmed_seq2))
 
 export_df <- data.frame(
   Sample = sample_name,
@@ -101,11 +104,13 @@ export_df <- data.frame(
   Trimmed_Sequence_5 = trimmed_seq,
   Trimmed_Sequence = trimmed_seq2,
   Trimmed_5_Seq_Length = trimmed_length,
-  Trimmed_Seq_Length = trimmed_length2
+  Trimmed_Seq_Length = trimmed_length2,
+  Trimmed_N_Content = N_content,
+  Trimmed_N_Percent = N_percent
 )
 assign(paste0(sample_name, "_export_df"), export_df, envir=.GlobalEnv)
 
-write_delim(export_df, paste0("/Users/jaygoddard/Hogan Lab Dropbox/Joshua Goddard/Jay Goddard/Computational/J215/J215_Jackson-transposon-sequencing/insertion_sites_investigation_20240626/trimmed_sequences/", sample_name, "_trimmed.csv"), delim=",")
+write_delim(export_df, paste0("<path-to-sequences>", sample_name, "_trimmed.csv"), delim=",")
 }
 ```
 
@@ -115,17 +120,17 @@ write_delim(export_df, paste0("/Users/jaygoddard/Hogan Lab Dropbox/Joshua Goddar
 
 ### Full FastQ and TSV import
 
-Will now import tsv files containing sanger sequence read and associated bp phred scores, to run through the three below functions, and select final trimmed sequence to assemble as multi-fasta for next step (alignment against J215 genome).
+Will now import tsv files containing sanger sequence read and associated bp phred scores, to run through the three below functions, and select final trimmed sequence to assemble as multi-fasta for next step (alignment against genome).
 
 To reiterate, a sanger read's ab1 file can be opened in Snapgene and exported as a tsv to convert the features within that spectra file into a usable table.
 
 Plan is initial cut-off phred=30 (ie. I will not take stop trimming until the 20bp rolling avg comes above 30), but will allow middle-sequence and tailing lower quality, while hoping to keep at or above phred=20.
 
 ```{r tools_import}
-setwd("/Users/jaygoddard/Hogan Lab Dropbox/Joshua Goddard/Jay Goddard/Computational/J215/J215_Jackson-transposon-sequencing")
-phred_ascii_conv <- read.csv("./insertion_sites_investigation_20240626/phred_ascii_conversion_20240626.csv")
+setwd("<path-to-sequences>")
+phred_ascii_conv <- read.csv("./phred_ascii_conversion_20240626.csv")
 #<strain-to-file_name labels import>
-strain_to_file <- read.csv("./insertion_sites_investigation_20240626/strain_to_file_labels.csv")
+strain_to_file <- read.csv("./strain_to_file_labels.csv")
 #for loop or manual entry of all tsv files converted from ab1 files, ensuring data is properly assigned to sample throughout workflow
 ```
 
@@ -150,12 +155,12 @@ for(file in files_to_read1){
 }
 
 #run these next three lines only once. They are for combining individual full/trimmed sequences to single dataframe. Running again in between samples will overwrite existing dataframe
-export_cols <- c("Sample", "Sequence", "Sequence_Length", "Trim_5_Length", "Trimmed_Sequence_5", "Trimmed_Sequence", "Trimmed_Length_5", "Trimmed_Length")
+export_cols <- c("Sample", "Sequence", "Sequence_Length", "Trim_5_Length", "Trimmed_Sequence_5", "Trimmed_Sequence", "Trimmed_Length_5", "Trimmed_Length", "Trimmed_N_Content", "Trimmed_N_Percent")
 trimmed_df = data.frame(matrix(nrow=0,ncol=length(export_cols)))
 colnames(trimmed_df) <- export_cols 
 
 
-XXX_XXX_tsv <- read.delim2("./insertion_sites_investigation_20240626/sequence_quality_scores/20240308_igor/189829_G07_026.tsv") #example import of 1 file
+XXX_XXX_tsv <- read.delim2("./189829_G07_026.tsv") #example import of 1 file
 
 #for easier entry of all four functions, without accidental typos from sample to sample...
 in1 <- XXX_XXX_tsv #if using for loop above, will need to use full file name that was imported as dataframe label
@@ -178,11 +183,11 @@ trimmed_df <- (rbind(trimmed_df, get(paste0(sname, "_export_df")))) #perform thi
 #and now, having gathered all original/trimmed sequences into one dataframe, time for multifasta export...
 
 trimmed_export_df <- trimmed_df %>% 
-  unite(col="Read_ID", c("Sample", "Trim_5_Length", "Trimmed_Seq_Length"), sep="|")
+  unite(col="Read_ID", c("Sample", "Trim_5_Length", "Trimmed_Seq_Length", "Trimmed_N_Content", "Trimmed_N_Percent"), sep="|")
 trimmed_export2_df<- trimmed_export_df[,c("Read_ID","Trimmed_Sequence")]
 trimmed_export2_df$Read_ID <- paste0(">",trimmed_export2_df$Read_ID) 
 
-write.table(trimmed_export2_df, "/trimmed_sequences/igor20240308_trimmed.fasta", quote=FALSE, sep="\n", col.names = FALSE, row.names = FALSE)
+write.table(trimmed_export2_df, "/trimmed_sequences/<sample-batch-name>_trimmed.fasta", quote=FALSE, sep="\n", col.names = FALSE, row.names = FALSE)
 ```
 
 
@@ -193,4 +198,4 @@ From here, all exported csv's can be merged in excel, saved as a text file, and 
 
 Alternatively (as shown above in this document), the data exported as individual csv files can also be gathered into a single dataframe and exported as a multi-fasta within R.
 
-This multi-fasta will be run through MUMmer's nucmer/show-coords functions against the J215 genome to locate transposon insertion sites, or re-uploaded into Snapgene for manual alignment using the trimmed sequence.
+This multi-fasta will be run through MUMmer's nucmer/show-coords functions against the relevant genome to locate transposon insertion sites, or re-uploaded into Snapgene for manual alignment using the trimmed sequences.
