@@ -116,7 +116,7 @@ write_delim(export_df, paste0("<path-to-sequences>", sample_name, "_trimmed.csv"
 
 
 
-## Actual Sample Workflow
+## Section 3: Actual Sample Workflow
 
 ### Full FastQ and TSV import
 
@@ -192,7 +192,7 @@ write.table(trimmed_export2_df, "/trimmed_sequences/<sample-batch-name>_trimmed.
 
 
 
-## Next Steps
+## Section 4: Next Steps
 
 From here, all exported csv's can be merged in excel, saved as a text file, and formatting converted into multi-fasta sequence (with sequence name AND 5' trimmed length in sample/"contig" name, for usage in future steps). 
 
